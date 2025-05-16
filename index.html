@@ -1,22 +1,275 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Matt's Embedder 3.0</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matt's Embedder 4.0</title>
+  <style>
+    :root {
+      --border: 2px solid #000;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f9f9f9;
+      margin: 0;
+      padding: 1.5rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    #app {
+      background: #fff;
+      border: var(--border);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 960px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-top: 0;
+    }
+
+    .wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+    }
+
+    .player iframe {
+      width: 560px;
+      max-width: 100%;
+      aspect-ratio: 16/9;
+      border: var(--border);
+    }
+
+    .history {
+      flex: 1 1 240px;
+      max-height: 360px;
+      overflow-y: auto;
+      border: var(--border);
+      padding: 0.75rem;
+    }
+
+    .history h2 {
+      margin: 0 0 0.5rem;
+      font-size: 1.1rem;
+    }
+
+    .history ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .history li {
+      cursor: pointer;
+      padding: 0.4rem 0.25rem;
+      border-bottom: 1px solid #e2e2e2;
+      user-select: none;
+      transition: background 0.15s ease-in-out;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .history li:last-child {
+      border-bottom: none;
+    }
+
+    .history li:hover {
+      background: #efefef;
+    }
+
+    .controls {
+      margin-top: 1.25rem;
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .controls input {
+      flex: 1 1 240px;
+      min-width: 200px;
+      padding: 0.5rem 0.75rem;
+      font-size: 1rem;
+    }
+
+    .controls button {
+      padding: 0.55rem 1.2rem;
+      font-size: 1rem;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #000;
+      color: #fff;
+      transition: opacity 0.2s ease-in-out;
+    }
+
+    .controls button:hover {
+      opacity: 0.85;
+    }
+
+    @media (max-width: 700px) {
+      .wrapper {
+        flex-direction: column;
+      }
+
+      .history {
+        max-height: 160px;
+      }
+    }
+  </style>
 </head>
 <body>
+  <div id="app">
+    <h1>Matt's Embedder 4.0</h1>
 
-  <h1>Matt's Embedder 3.0</h1>
+    <div class="wrapper">
+      <!-- Video Player -->
+      <div class="player">
+        <iframe
+          id="ytPlayer"
+          src=""
+          title="Embedded YouTube video player"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        ></iframe>
+      </div>
 
-  <div id="video-container">
-    <div class="video-wrapper">
-      <div id="loading-placeholder">Loading...</div>
-      <iframe id="video-iframe" src="" frameborder="0" allowfullscreen></iframe>
+      <!-- History List -->
+      <div class="history">
+        <h2>Previously Watched</h2>
+        <ul id="historyList"></ul>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <input
+        id="ytCode"
+        type="text"
+        placeholder="Enter YouTube code (e.g. dQw4w9WgXcQ)"
+        autocomplete="off"
+      />
+      <button id="submitBtn" type="button">Play</button>
     </div>
   </div>
 
-  <input type="text" id="video-code" placeholder="Enter YouTube video code" oninput="updateVideo()">
+  <script>
+    (function () {
+      const COOKIE_NAME = "ytHistory";
+      const player = document.getElementById("ytPlayer");
+      const input = document.getElementById("ytCode");
+      const list = document.getElementById("historyList");
+      const btn = document.getElementById("submitBtn");
 
-  <script src="script.js"></script>
+      let history = loadHistory();
+      renderHistory();
+
+      btn.addEventListener("click", handleSubmit);
+      input.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") handleSubmit();
+      });
+
+      function handleSubmit() {
+        const code = input.value.trim();
+        if (!code) return;
+        playVideo(code);
+        fetchTitleAndStore(code);
+        input.value = "";
+      }
+
+      function playVideo(id) {
+        player.src = `https://www.youtube.com/embed/${id}?rel=0`;
+      }
+
+      async function fetchTitleAndStore(id) {
+        const title = await getTitle(id);
+        storeVideo(id, title);
+        renderHistory();
+      }
+
+      async function getTitle(id) {
+        try {
+          const res = await fetch(
+            `https://noembed.com/embed?url=https://www.youtube.com/watch?v=${id}`
+          );
+          if (!res.ok) throw new Error("Request failed");
+          const data = await res.json();
+          return data.title || id;
+        } catch (e) {
+          // Fallback to the raw video ID if title can't be fetched
+          return id;
+        }
+      }
+
+      function storeVideo(id, title) {
+        // Remove duplicate entries and add new one to the top
+        history = history.filter((v) => v.id !== id);
+        history.unshift({ id, title });
+        saveHistory();
+      }
+
+      function renderHistory() {
+        list.innerHTML = "";
+        history.forEach(({ id, title }) => {
+          const li = document.createElement("li");
+          li.textContent = title;
+          li.title = title; // Full title tooltip
+          li.addEventListener("click", () => playVideo(id));
+          list.appendChild(li);
+        });
+      }
+
+      // ================= Cookie Helpers =================
+      function loadHistory() {
+        const cookie = getCookie(COOKIE_NAME);
+        if (cookie) {
+          try {
+            return JSON.parse(cookie);
+          } catch (err) {
+            return [];
+          }
+        }
+        return [];
+      }
+
+      function saveHistory() {
+        setCookie(COOKIE_NAME, JSON.stringify(history), 365);
+      }
+
+      function setCookie(name, value, days) {
+        let expires = "";
+        if (days) {
+          const date = new Date();
+          date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+          expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie =
+          name + "=" + encodeURIComponent(value || "") + expires + "; path=/";
+      }
+
+      function getCookie(name) {
+        const nameEQ = name + "=";
+        const ca = document.cookie.split(";");
+        for (let i = 0; i < ca.length; i++) {
+          let c = ca[i];
+          while (c.charAt(0) === " ") c = c.substring(1, c.length);
+          if (c.indexOf(nameEQ) === 0)
+            return decodeURIComponent(c.substring(nameEQ.length, c.length));
+        }
+        return null;
+      }
+    })();
+  </script>
 </body>
 </html>
