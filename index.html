@@ -23,6 +23,7 @@
       justify-content: center;
     }
 
+    /* ===================== Layout ===================== */
     #app {
       background: #fff;
       border: var(--border);
@@ -42,19 +43,36 @@
       gap: 1.25rem;
     }
 
-    .player iframe {
-      width: 560px;
+    /* -------- Responsive YouTube player -------- */
+    .player {
+      flex: 1 1 560px;
+      position: relative; /* establishes containing block for iframe */
       max-width: 100%;
-      aspect-ratio: 16/9;
+      z-index: 10; /* keep it above other siblings */
+    }
+    /* 16:9 container trick */
+    .player::before {
+      content: "";
+      display: block;
+      padding-top: 56.25%; /* 16 ÷ 9 = 0.5625 */
+    }
+    .player iframe {
+      position: absolute;
+      inset: 0; /* shorthand for top/right/bottom/left = 0 */
+      width: 100%;
+      height: 100%;
       border: var(--border);
     }
 
+    /* -------- History list -------- */
     .history {
       flex: 1 1 240px;
       max-height: 360px;
       overflow-y: auto;
       border: var(--border);
       padding: 0.75rem;
+      position: relative;
+      z-index: 5;
     }
 
     .history h2 {
@@ -87,6 +105,7 @@
       background: #efefef;
     }
 
+    /* -------- Controls -------- */
     .controls {
       margin-top: 1.25rem;
       display: flex;
@@ -117,13 +136,19 @@
       opacity: 0.85;
     }
 
-    @media (max-width: 700px) {
+    /* ===================== Responsive tweaks ===================== */
+
+    @media (max-width: 800px) {
       .wrapper {
         flex-direction: column;
       }
-
+      .player {
+        flex: none;
+        width: 100%;
+      }
       .history {
-        max-height: 160px;
+        width: 100%;
+        max-height: 200px;
       }
     }
   </style>
@@ -137,7 +162,6 @@
       <div class="player">
         <iframe
           id="ytPlayer"
-          src=""
           title="Embedded YouTube video player"
           frameborder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -175,6 +199,11 @@
       let history = loadHistory();
       renderHistory();
 
+      // Autoplay the most recent video on load (optional—comment out if unwanted)
+      if (history[0]) {
+        playVideo(history[0].id);
+      }
+
       btn.addEventListener("click", handleSubmit);
       input.addEventListener("keypress", (e) => {
         if (e.key === "Enter") handleSubmit();
@@ -189,7 +218,7 @@
       }
 
       function playVideo(id) {
-        player.src = `https://www.youtube.com/embed/${id}?rel=0`;
+        player.src = `https://www.youtube.com/embed/${id}?rel=0&autoplay=1`;
       }
 
       async function fetchTitleAndStore(id) {
@@ -207,8 +236,7 @@
           const data = await res.json();
           return data.title || id;
         } catch (e) {
-          // Fallback to the raw video ID if title can't be fetched
-          return id;
+          return id; // Fallback if title can't be fetched
         }
       }
 
@@ -224,19 +252,19 @@
         history.forEach(({ id, title }) => {
           const li = document.createElement("li");
           li.textContent = title;
-          li.title = title; // Full title tooltip
+          li.title = title;
           li.addEventListener("click", () => playVideo(id));
           list.appendChild(li);
         });
       }
 
-      // ================= Cookie Helpers =================
+      /* ================= Cookie Helpers ================= */
       function loadHistory() {
         const cookie = getCookie(COOKIE_NAME);
         if (cookie) {
           try {
             return JSON.parse(cookie);
-          } catch (err) {
+          } catch (_) {
             return [];
           }
         }
