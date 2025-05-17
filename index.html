@@ -302,17 +302,17 @@
         renderHistory();
       }
 
-      function renderHistory() {
+     function renderHistory() {
         list.innerHTML = "";
         history.forEach(({ id, title }) => {
           const li = document.createElement("li");
           li.textContent = title;
           li.title = title;
 
-          // click to play
+          // play on click
           li.addEventListener("click", () => playVideo(id));
 
-          /* ---- swipe to delete ---- */
+          // swipe (touch) to delete
           let touchStartX = 0;
           li.addEventListener("touchstart", (e) => {
             touchStartX = e.touches[0].clientX;
@@ -325,7 +325,7 @@
             }
           });
 
-          // desktop double-click delete
+          // desktop double‑click delete
           li.addEventListener("dblclick", () => deleteVideo(id));
 
           list.appendChild(li);
@@ -342,4 +342,43 @@
 
       /* ================= Cookie Helpers ================= */
       function loadHistory() {
-        const cookie = getCookie
+        const cookie = getCookie(COOKIE_NAME);
+        if (cookie) {
+          try {
+            return JSON.parse(cookie);
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      }
+
+      function saveHistory() {
+        if (incognito) return; // don’t persist while incognito
+        setCookie(COOKIE_NAME, JSON.stringify(history), 365);
+      }
+
+      function setCookie(name, value, days) {
+        let expires = "";
+        if (days) {
+          const date = new Date();
+          date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+          expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = `${name}=${encodeURIComponent(value || "")}${expires}; path=/`;
+      }
+
+      function getCookie(name) {
+        const nameEQ = `${name}=`;
+        const ca = document.cookie.split(";");
+        for (let i = 0; i < ca.length; i++) {
+          let c = ca[i];
+          while (c.charAt(0) === " ") c = c.substring(1);
+          if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length));
+        }
+        return null;
+      }
+    })();
+  </script>
+</body>
+</html>
