@@ -4,32 +4,45 @@
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Matt's Embedder 4.1</title>
+  <title>Matt's Embedder 4.0</title>
   <style>
     :root {
       --border: 2px solid #000;
+      --bg-main: #fff;
+      --bg-body: #f9f9f9;
+      --txt-main: #000;
+    }
+
+    body.incognito {
+      --bg-main: #333;
+      --bg-body: #222;
+      --txt-main: #fff;
     }
 
     * {
       box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
     }
 
     body {
       font-family: Arial, Helvetica, sans-serif;
-      background: #f9f9f9;
+      background: var(--bg-body);
+      color: var(--txt-main);
       margin: 0;
       padding: 1.5rem;
       display: flex;
       justify-content: center;
+      transition: background 0.3s ease, color 0.3s ease;
     }
 
     /* ===================== Layout ===================== */
     #app {
-      background: #fff;
+      background: var(--bg-main);
       border: var(--border);
       padding: 1.5rem;
       width: 100%;
       max-width: 960px;
+      transition: background 0.3s ease;
     }
 
     h1 {
@@ -46,19 +59,18 @@
     /* -------- Responsive YouTube player -------- */
     .player {
       flex: 1 1 560px;
-      position: relative; /* establishes containing block for iframe */
+      position: relative;
       max-width: 100%;
-      z-index: 10; /* keep it above other siblings */
+      z-index: 10;
     }
-    /* 16:9 container trick */
     .player::before {
       content: "";
       display: block;
-      padding-top: 56.25%; /* 16 ÷ 9 = 0.5625 */
+      padding-top: 56.25%;
     }
     .player iframe {
       position: absolute;
-      inset: 0; /* shorthand for top/right/bottom/left = 0 */
+      inset: 0;
       width: 100%;
       height: 100%;
       border: var(--border);
@@ -73,6 +85,7 @@
       padding: 0.75rem;
       position: relative;
       z-index: 5;
+      background: inherit;
     }
 
     .history h2 {
@@ -88,13 +101,14 @@
 
     .history li {
       cursor: pointer;
-      padding: 0.4rem 0.25rem;
+      padding: 0.55rem 0.4rem;
       border-bottom: 1px solid #e2e2e2;
       user-select: none;
-      transition: background 0.15s ease-in-out;
+      transition: background 0.15s ease-in-out, transform 0.15s ease-in-out;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      touch-action: pan-y;
     }
 
     .history li:last-child {
@@ -102,7 +116,13 @@
     }
 
     .history li:hover {
-      background: #efefef;
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    /* swipe delete visual cue */
+    .history li.removing {
+      transform: translateX(-100%);
+      opacity: 0;
     }
 
     /* -------- Controls -------- */
@@ -127,13 +147,25 @@
       cursor: pointer;
       border: none;
       border-radius: 4px;
-      background: #000;
-      color: #fff;
+      background: var(--txt-main);
+      color: var(--bg-main);
       transition: opacity 0.2s ease-in-out;
     }
 
     .controls button:hover {
       opacity: 0.85;
+    }
+
+    /* Incognito toggle styles */
+    #incognitoBtn {
+      background: transparent;
+      border: var(--border);
+      color: var(--txt-main);
+    }
+
+    #incognitoBtn.active {
+      background: var(--txt-main);
+      color: var(--bg-main);
     }
 
     /* ===================== Responsive tweaks ===================== */
@@ -155,7 +187,7 @@
 </head>
 <body>
   <div id="app">
-    <h1>Matt's Embedder 4.1</h1>
+    <h1>Matt's Embedder 4.0</h1>
 
     <div class="wrapper">
       <!-- Video Player -->
@@ -185,6 +217,7 @@
         autocomplete="off"
       />
       <button id="submitBtn" type="button">Play</button>
+      <button id="incognitoBtn" type="button" title="Toggle incognito mode">Incognito: Off</button>
     </div>
   </div>
 
@@ -194,26 +227,32 @@
       const player = document.getElementById("ytPlayer");
       const input = document.getElementById("ytCode");
       const list = document.getElementById("historyList");
-      const btn = document.getElementById("submitBtn");
+      const btnPlay = document.getElementById("submitBtn");
+      const btnIncog = document.getElementById("incognitoBtn");
 
       let history = loadHistory();
+      let incognito = false;
+
       renderHistory();
 
-      // Autoplay the most recent video on load (optional—comment out if unwanted)
       if (history[0]) {
         playVideo(history[0].id);
       }
 
-      btn.addEventListener("click", handleSubmit);
+      // ======= Event listeners =======
+      btnPlay.addEventListener("click", handleSubmit);
       input.addEventListener("keypress", (e) => {
         if (e.key === "Enter") handleSubmit();
       });
+      btnIncog.addEventListener("click", toggleIncognito);
 
       function handleSubmit() {
         const code = input.value.trim();
         if (!code) return;
         playVideo(code);
-        fetchTitleAndStore(code);
+        if (!incognito) {
+          fetchTitleAndStore(code);
+        }
         input.value = "";
       }
 
@@ -236,15 +275,20 @@
           const data = await res.json();
           return data.title || id;
         } catch (e) {
-          return id; // Fallback if title can't be fetched
+          return id;
         }
       }
 
       function storeVideo(id, title) {
-        // Remove duplicate entries and add new one to the top
         history = history.filter((v) => v.id !== id);
         history.unshift({ id, title });
         saveHistory();
+      }
+
+      function deleteVideo(id) {
+        history = history.filter((v) => v.id !== id);
+        saveHistory();
+        renderHistory();
       }
 
       function renderHistory() {
@@ -253,9 +297,38 @@
           const li = document.createElement("li");
           li.textContent = title;
           li.title = title;
+
+          // click to play
           li.addEventListener("click", () => playVideo(id));
+
+          /* ---- swipe to delete ---- */
+          let touchStartX = 0;
+          li.addEventListener("touchstart", (e) => {
+            touchStartX = e.touches[0].clientX;
+          });
+
+          li.addEventListener("touchend", (e) => {
+            const dx = e.changedTouches[0].clientX - touchStartX;
+            if (Math.abs(dx) > 60) {
+              // animate out then remove
+              li.classList.add("removing");
+              setTimeout(() => deleteVideo(id), 150);
+            }
+          });
+
+          // optional desktop double‑click delete
+          li.addEventListener("dblclick", () => deleteVideo(id));
+
           list.appendChild(li);
         });
+      }
+
+      /* ================= Incognito Mode ================= */
+      function toggleIncognito() {
+        incognito = !incognito;
+        document.body.classList.toggle("incognito", incognito);
+        btnIncog.classList.toggle("active", incognito);
+        btnIncog.textContent = `Incognito: ${incognito ? "On" : "Off"}`;
       }
 
       /* ================= Cookie Helpers ================= */
@@ -272,6 +345,8 @@
       }
 
       function saveHistory() {
+        // Do not persist if incognito
+        if (incognito) return;
         setCookie(COOKIE_NAME, JSON.stringify(history), 365);
       }
 
