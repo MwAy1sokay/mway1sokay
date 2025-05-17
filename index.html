@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Matt's Embedder 4.0</title>
+  <title>Matt's Embedder 4.2</title>
+  <!-- Cyber‑style font for the version number -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     :root {
       --border: 2px solid #000;
@@ -48,7 +50,18 @@
     h1 {
       text-align: center;
       margin-top: 0;
+      user-select: none;
     }
+
+    /* cyber‑punk version styling */
+    .version {
+      font-family: 'Orbitron', 'Share Tech Mono', monospace;
+      font-style: italic;
+      color: #0ff;
+      text-shadow: 0 0 4px currentColor;
+    }
+    body:not(.incognito) .version { color: #00aaff; }
+    body.incognito .version { color: #0ff; }
 
     .wrapper {
       display: flex;
@@ -119,7 +132,6 @@
       background: rgba(0, 0, 0, 0.05);
     }
 
-    /* swipe delete visual cue */
     .history li.removing {
       transform: translateX(-100%);
       opacity: 0;
@@ -156,7 +168,6 @@
       opacity: 0.85;
     }
 
-    /* Incognito toggle styles */
     #incognitoBtn {
       background: transparent;
       border: var(--border);
@@ -187,7 +198,7 @@
 </head>
 <body>
   <div id="app">
-    <h1>Matt's Embedder 4.0</h1>
+    <h1>Matt's Embedder <span class="version">4.2</span></h1>
 
     <div class="wrapper">
       <!-- Video Player -->
@@ -274,7 +285,7 @@
           if (!res.ok) throw new Error("Request failed");
           const data = await res.json();
           return data.title || id;
-        } catch (e) {
+        } catch (_) {
           return id;
         }
       }
@@ -306,17 +317,15 @@
           li.addEventListener("touchstart", (e) => {
             touchStartX = e.touches[0].clientX;
           });
-
           li.addEventListener("touchend", (e) => {
             const dx = e.changedTouches[0].clientX - touchStartX;
             if (Math.abs(dx) > 60) {
-              // animate out then remove
               li.classList.add("removing");
               setTimeout(() => deleteVideo(id), 150);
             }
           });
 
-          // optional desktop double‑click delete
+          // desktop double-click delete
           li.addEventListener("dblclick", () => deleteVideo(id));
 
           list.appendChild(li);
@@ -333,46 +342,4 @@
 
       /* ================= Cookie Helpers ================= */
       function loadHistory() {
-        const cookie = getCookie(COOKIE_NAME);
-        if (cookie) {
-          try {
-            return JSON.parse(cookie);
-          } catch (_) {
-            return [];
-          }
-        }
-        return [];
-      }
-
-      function saveHistory() {
-        // Do not persist if incognito
-        if (incognito) return;
-        setCookie(COOKIE_NAME, JSON.stringify(history), 365);
-      }
-
-      function setCookie(name, value, days) {
-        let expires = "";
-        if (days) {
-          const date = new Date();
-          date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
-          expires = "; expires=" + date.toUTCString();
-        }
-        document.cookie =
-          name + "=" + encodeURIComponent(value || "") + expires + "; path=/";
-      }
-
-      function getCookie(name) {
-        const nameEQ = name + "=";
-        const ca = document.cookie.split(";");
-        for (let i = 0; i < ca.length; i++) {
-          let c = ca[i];
-          while (c.charAt(0) === " ") c = c.substring(1, c.length);
-          if (c.indexOf(nameEQ) === 0)
-            return decodeURIComponent(c.substring(nameEQ.length, c.length));
-        }
-        return null;
-      }
-    })();
-  </script>
-</body>
-</html>
+        const cookie = getCookie
